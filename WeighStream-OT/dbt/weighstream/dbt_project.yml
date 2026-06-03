@@ -1,0 +1,31 @@
+name: weighstream
+version: "1.0.0"
+config-version: 2
+
+profile: weighstream
+
+model-paths:  ["models"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  weighstream:
+    staging:
+      +schema: silver
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: table
+      +file_format: parquet
+
+snapshots:
+  weighstream:
+    +target_schema: gold
+    +strategy: timestamp
+    +updated_at: updated_at
+    +file_format: parquet

@@ -1,0 +1,88 @@
+version: 2
+
+sources:
+  - name: silver
+    database: iceberg
+    schema: silver
+    tables:
+      - name: weigh_readings_clean
+        description: "Deduplicated, validated Silver table from Flink."
+
+models:
+  - name: stg_weigh_readings
+    description: "Staging view on Silver — DQ-filtered, typed."
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+      - name: device_id
+        tests: [not_null]
+      - name: site_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SITE_A', 'SITE_B', 'SITE_C', 'SITE_D']
+      - name: device_status
+        tests:
+          - accepted_values:
+              values: ['OK', 'CALIB_WARN', 'FAULT']
+      - name: shift
+        tests:
+          - accepted_values:
+              values: ['DAY', 'EVENING', 'NIGHT']
+      - name: gross_weight_kg
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= tare_weight_kg"
+      - name: net_weight_kg
+        tests: [not_null]
+
+  - name: fact_weighments
+    description: "Grain: one row per validated weigh event."
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+      - name: device_sk
+        tests: [not_null]
+      - name: material_sk
+        tests: [not_null]
+      - name: site_sk
+        tests: [not_null]
+      - name: net_weight_kg
+        tests: [not_null]
+
+  - name: dim_device
+    description: "Current device attributes (SCD2 snapshot is dim_device_snapshot)."
+    columns:
+      - name: device_sk
+        tests: [unique, not_null]
+      - name: device_id
+        tests: [unique, not_null]
+
+  - name: dim_material
+    description: "Material dimension."
+    columns:
+      - name: material_sk
+        tests: [unique, not_null]
+      - name: material_code
+        tests: [unique, not_null]
+
+  - name: dim_site
+    description: "Site dimension."
+    columns:
+      - name: site_sk
+        tests: [unique, not_null]
+      - name: site_id
+        tests: [unique, not_null]
+
+  - name: agg_throughput_5m
+    description: "5-minute throughput rollup per site."
+    columns:
+      - name: reading_count
+        tests: [not_null]
+
+  - name: agg_site_daily
+    description: "Daily totals per site."
+    columns:
+      - name: total_net_weight_kg
+        tests: [not_null]
